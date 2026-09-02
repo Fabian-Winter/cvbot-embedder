@@ -1,0 +1,8 @@
+langchain-core
+langchain-text-splitters
+langchain-aws
+langchain-chroma
+chromadb==1.5.9
+boto3
+tiktoken
+pytest

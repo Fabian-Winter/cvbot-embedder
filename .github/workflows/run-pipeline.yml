@@ -1,0 +1,84 @@
+name: Run embedding pipeline
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+
+jobs:
+  start-infra:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      chroma_host: ${{ steps.chroma-ip.outputs.host }}
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Start runner EC2 instance
+        run: aws ec2 start-instances --instance-ids "${{ vars.EC2_INSTANCE_ID }}"
+
+      - name: Wait for instance to be running
+        run: aws ec2 wait instance-running --instance-ids "${{ vars.EC2_INSTANCE_ID }}"
+
+      - name: Scale up ChromaDB Fargate service
+        run: |
+          aws ecs update-service --cluster "${{ vars.ECS_CLUSTER }}" --service "${{ vars.ECS_SERVICE }}" --desired-count 1
+          aws ecs wait services-stable --cluster "${{ vars.ECS_CLUSTER }}" --services "${{ vars.ECS_SERVICE }}"
+
+      - name: Resolve ChromaDB task IP
+        id: chroma-ip
+        run: |
+          set -euo pipefail
+          task_arn=$(aws ecs list-tasks --cluster "${{ vars.ECS_CLUSTER }}" --service-name "${{ vars.ECS_SERVICE }}" \
+            --query 'taskArns[0]' --output text)
+          eni_id=$(aws ecs describe-tasks --cluster "${{ vars.ECS_CLUSTER }}" --tasks "$task_arn" \
+            --query 'tasks[0].attachments[0].details[?name==`networkInterfaceId`].value' --output text)
+          ip=$(aws ec2 describe-network-interfaces --network-interface-ids "$eni_id" \
+            --query 'NetworkInterfaces[0].PrivateIpAddress' --output text)
+          echo "host=$ip" >> "$GITHUB_OUTPUT"
+
+  run-pipeline:
+    needs: start-infra
+    runs-on: [self-hosted, "${{ vars.RUNNER_LABEL }}"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Sync documents from S3
+        run: aws s3 sync "s3://${{ vars.S3_BUCKET }}" documents/ --delete
+
+      - name: Run embedding pipeline
+        run: |
+          python -m cvbot_embedder \
+            --chroma-host "${{ needs.start-infra.outputs.chroma_host }}" \
+            --chroma-port "${{ vars.CHROMA_PORT }}"
+
+  stop-infra:
+    needs: [start-infra, run-pipeline]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Scale down ChromaDB Fargate service
+        run: aws ecs update-service --cluster "${{ vars.ECS_CLUSTER }}" --service "${{ vars.ECS_SERVICE }}" --desired-count 0
+
+      - name: Stop runner EC2 instance
+        run: aws ec2 stop-instances --instance-ids "${{ vars.EC2_INSTANCE_ID }}"
