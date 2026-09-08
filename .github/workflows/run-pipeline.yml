@@ -77,14 +77,14 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install dependencies
-        run: python3 -m pip install -r requirements.txt
+        run: python3.13 -m pip install -r requirements.txt
 
       - name: Sync documents from S3
         run: aws s3 sync "s3://${{ vars.S3_BUCKET }}" documents/ --delete
 
       - name: Run embedding pipeline
         run: |
-          python3 -m cvbot_embedder \
+          python3.13 -m cvbot_embedder \
             --chroma-host "${{ needs.start-infra.outputs.chroma_host }}" \
             --chroma-port "${{ vars.CHROMA_PORT }}"
 
