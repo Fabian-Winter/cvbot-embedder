@@ -24,8 +24,6 @@ def test_from_env_uses_defaults_when_unset() -> None:
     assert settings.chroma_port == DEFAULT_CHROMA_PORT
     assert settings.collection_name == DEFAULT_COLLECTION_NAME
     assert settings.embedding_model_id == DEFAULT_EMBEDDING_MODEL_ID
-    assert settings.chroma_auth_token is None
-    assert settings.chroma_ssl is False
     assert settings.log_level == DEFAULT_LOG_LEVEL
 
 
@@ -35,8 +33,6 @@ def test_from_env_reads_all_values() -> None:
             "DOCUMENTS_DIR": "/data/docs",
             "CHROMA_HOST": "chroma.internal",
             "CHROMA_PORT": "8443",
-            "CHROMA_SSL": "true",
-            "CHROMA_AUTH_TOKEN": "secret",
             "CHROMA_COLLECTION": "jobs",
             "AWS_REGION": "eu-west-1",
             "EMBEDDING_MODEL_ID": "amazon.titan-embed-text-v1",
@@ -50,8 +46,6 @@ def test_from_env_reads_all_values() -> None:
     assert settings.documents_dir == Path("/data/docs")
     assert settings.chroma_host == "chroma.internal"
     assert settings.chroma_port == 8443
-    assert settings.chroma_ssl is True
-    assert settings.chroma_auth_token == "secret"
     assert settings.collection_name == "jobs"
     assert settings.aws_region == "eu-west-1"
     assert settings.max_chunk_tokens == 256
@@ -64,19 +58,6 @@ def test_from_env_reads_process_environment(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setenv("CHROMA_HOST", "from-process-env")
 
     assert Settings.from_env().chroma_host == "from-process-env"
-
-
-@pytest.mark.parametrize(
-    ("raw", "expected"),
-    [("1", True), ("TRUE", True), ("yes", True), ("on", True), ("0", False),
-     ("false", False), ("", False)],
-)
-def test_bool_parsing(raw: str, expected: bool) -> None:
-    assert Settings.from_env(env={"CHROMA_SSL": raw}).chroma_ssl is expected
-
-
-def test_empty_auth_token_becomes_none() -> None:
-    assert Settings.from_env(env={"CHROMA_AUTH_TOKEN": ""}).chroma_auth_token is None
 
 
 def test_non_numeric_port_raises() -> None:

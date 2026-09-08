@@ -19,27 +19,19 @@ def create_client(settings: Settings) -> chromadb.ClientAPI:
     """Creates an HTTP client for the ChromaDB instance.
 
     Args:
-        settings: Runtime configuration holding host, port, SSL and token.
+        settings: Runtime configuration holding host and port.
 
     Returns:
         The connected Chroma client.
     """
-    headers = (
-        {"Authorization": f"Bearer {settings.chroma_auth_token}"}
-        if settings.chroma_auth_token
-        else None
-    )
     LOGGER.info(
-        "connecting to ChromaDB: %s:%d (ssl=%s)",
+        "connecting to ChromaDB: %s:%d",
         settings.chroma_host,
         settings.chroma_port,
-        settings.chroma_ssl,
     )
     return chromadb.HttpClient(
         host=settings.chroma_host,
         port=settings.chroma_port,
-        ssl=settings.chroma_ssl,
-        headers=headers,
     )
 
 

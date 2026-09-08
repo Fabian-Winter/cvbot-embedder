@@ -23,27 +23,12 @@ def test_create_client_passes_connection_settings(
     monkeypatch.setattr(
         vector_store.chromadb, "HttpClient", lambda **kw: captured.update(kw)
     )
-    settings = Settings(
-        chroma_host="chroma.internal", chroma_port=8443, chroma_ssl=True
-    )
+    settings = Settings(chroma_host="chroma.internal", chroma_port=8443)
 
     vector_store.create_client(settings)
 
     assert captured["host"] == "chroma.internal"
     assert captured["port"] == 8443
-    assert captured["ssl"] is True
-    assert captured["headers"] is None
-
-
-def test_create_client_sets_bearer_header(monkeypatch: pytest.MonkeyPatch) -> None:
-    captured: dict[str, object] = {}
-    monkeypatch.setattr(
-        vector_store.chromadb, "HttpClient", lambda **kw: captured.update(kw)
-    )
-
-    vector_store.create_client(Settings(chroma_auth_token="secret"))
-
-    assert captured["headers"] == {"Authorization": "Bearer secret"}
 
 
 def test_recreate_collection_deletes_existing(

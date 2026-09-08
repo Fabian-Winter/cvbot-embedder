@@ -18,7 +18,6 @@ DEFAULT_TOKEN_CHUNK_OVERLAP = 50
 DEFAULT_BATCH_SIZE = 50
 DEFAULT_LOG_LEVEL = "INFO"
 
-_TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
 _VALID_LOG_LEVELS = frozenset({"DEBUG", "INFO", "WARNING", "ERROR"})
 
 
@@ -30,8 +29,6 @@ class Settings:
         documents_dir: Local directory the documents are read from.
         chroma_host: Hostname of the ChromaDB container (AWS Fargate).
         chroma_port: Port of the ChromaDB container.
-        chroma_ssl: True if the connection uses HTTPS.
-        chroma_auth_token: Optional bearer token for ChromaDB.
         collection_name: Name of the collection that is recreated.
         aws_region: AWS region of the Bedrock client.
         embedding_model_id: Bedrock model ID used for the embeddings.
@@ -44,8 +41,6 @@ class Settings:
     documents_dir: Path = DEFAULT_DOCUMENTS_DIR
     chroma_host: str = DEFAULT_CHROMA_HOST
     chroma_port: int = DEFAULT_CHROMA_PORT
-    chroma_ssl: bool = False
-    chroma_auth_token: str | None = None
     collection_name: str = DEFAULT_COLLECTION_NAME
     aws_region: str = DEFAULT_AWS_REGION
     embedding_model_id: str = DEFAULT_EMBEDDING_MODEL_ID
@@ -103,8 +98,6 @@ class Settings:
             ),
             chroma_host=source.get("CHROMA_HOST", DEFAULT_CHROMA_HOST),
             chroma_port=_int(source, "CHROMA_PORT", DEFAULT_CHROMA_PORT),
-            chroma_ssl=_bool(source, "CHROMA_SSL", False),
-            chroma_auth_token=source.get("CHROMA_AUTH_TOKEN") or None,
             collection_name=source.get(
                 "CHROMA_COLLECTION", DEFAULT_COLLECTION_NAME
             ),
@@ -162,43 +155,3 @@ def _int(env: dict[str, str] | Any, key: str, default: int) -> int:
     except ValueError as exc:
         raise ValueError(f"{key} is not an integer: {raw!r}") from exc
 
-
-def _float(env: dict[str, str] | Any, key: str, default: float) -> float:
-    """Reads a floating point number from the environment.
-
-    Args:
-        env: Mapping of variable names to values.
-        key: Name of the variable.
-        default: Value used if the variable is not set.
-
-    Returns:
-        The parsed value or ``default``.
-
-    Raises:
-        ValueError: If the value is not a number.
-    """
-    raw = env.get(key)
-    if raw is None or raw == "":
-        return default
-    try:
-        return float(raw)
-    except ValueError as exc:
-        raise ValueError(f"{key} is not a number: {raw!r}") from exc
-
-
-def _bool(env: dict[str, str] | Any, key: str, default: bool) -> bool:
-    """Reads a boolean flag from the environment.
-
-    Args:
-        env: Mapping of variable names to values.
-        key: Name of the variable.
-        default: Value used if the variable is not set.
-
-    Returns:
-        ``True`` for "1", "true", "yes" or "on" (case-insensitive), otherwise
-        ``False``.
-    """
-    raw = env.get(key)
-    if raw is None or raw == "":
-        return default
-    return raw.strip().lower() in _TRUE_VALUES

@@ -23,7 +23,8 @@ pip install -r requirements.txt
 
 Requires Python 3.13 and AWS credentials with access to `bedrock:InvokeModel`
 for the configured embedding model. Credentials are resolved through the usual
-boto3 chain (environment variables, profile, IAM role of the Fargate task).
+boto3 chain (environment variables, profile, or the EC2 instance profile of
+the self-hosted GitHub Actions runner the pipeline runs on).
 
 ## Configuration
 
@@ -35,8 +36,6 @@ usually only `CHROMA_HOST` needs to be set.
 | `DOCUMENTS_DIR` | `documents` | Local directory holding the documents |
 | `CHROMA_HOST` | `localhost` | Hostname of the ChromaDB (Fargate service) |
 | `CHROMA_PORT` | `8000` | Port of the ChromaDB |
-| `CHROMA_SSL` | `false` | Use HTTPS (`1`, `true`, `yes`, `on`) |
-| `CHROMA_AUTH_TOKEN` | – | Optional bearer token for ChromaDB |
 | `CHROMA_COLLECTION` | `cvbot_documents` | Name of the collection |
 | `AWS_REGION` | `eu-central-1` | Region of the Bedrock client |
 | `EMBEDDING_MODEL_ID` | `amazon.titan-embed-text-v2:0` | Bedrock model ID |
@@ -64,6 +63,11 @@ python -m cvbot_embedder \
 
 The collection is dropped and rebuilt on **every** run. Running the pipeline
 twice over the same document set therefore yields the same chunk count.
+
+The `run-pipeline.yml` workflow passes `--chroma-port` from the GitHub Actions
+repository variable `CHROMA_PORT`. Keep it in sync with cvbot-infra's
+`chroma_port` Terraform variable (default `8000`), or remove the flag from the
+workflow to fall back to the matching `Settings` default.
 
 ## Tests
 
