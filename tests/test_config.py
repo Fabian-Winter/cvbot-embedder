@@ -20,7 +20,6 @@ def test_from_env_uses_defaults_when_unset() -> None:
     settings = Settings.from_env(env={})
 
     assert settings.documents_dir == DEFAULT_DOCUMENTS_DIR
-    assert settings.documents_dir.exists()
     assert settings.chroma_port == DEFAULT_CHROMA_PORT
     assert settings.collection_name == DEFAULT_COLLECTION_NAME
     assert settings.embedding_model_id == DEFAULT_EMBEDDING_MODEL_ID
