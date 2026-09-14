@@ -3,9 +3,20 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from cvbot_core.logging_config import VALID_LOG_LEVELS
+from cvbot_core.env import read_int, read_path, read_str
+from cvbot_core.overrides import apply_overrides
+from cvbot_core.validation import (
+    require_choice,
+    require_in_range,
+    require_non_empty,
+    require_port,
+    require_positive,
+)
 
 DEFAULT_DOCUMENTS_DIR = Path(__file__).resolve().parent.parent / "documents"
 DEFAULT_COLLECTION_NAME = "cvbot_documents"
@@ -17,8 +28,6 @@ DEFAULT_MAX_CHUNK_TOKENS = 512
 DEFAULT_TOKEN_CHUNK_OVERLAP = 50
 DEFAULT_BATCH_SIZE = 50
 DEFAULT_LOG_LEVEL = "INFO"
-
-_VALID_LOG_LEVELS = frozenset({"DEBUG", "INFO", "WARNING", "ERROR"})
 
 
 @dataclass(frozen=True)
@@ -55,25 +64,18 @@ class Settings:
         Raises:
             ValueError: If a value is outside the accepted range.
         """
-        if not self.chroma_host:
-            raise ValueError("chroma_host must not be empty")
-        if not self.collection_name:
-            raise ValueError("collection_name must not be empty")
-        if not 1 <= self.chroma_port <= 65535:
-            raise ValueError(f"chroma_port outside 1-65535: {self.chroma_port}")
-        if self.max_chunk_tokens < 1:
-            raise ValueError(
-                f"max_chunk_tokens must be positive: {self.max_chunk_tokens}"
-            )
-        if not 0 <= self.token_chunk_overlap < self.max_chunk_tokens:
-            raise ValueError(
-                "token_chunk_overlap must be smaller than max_chunk_tokens: "
-                f"{self.token_chunk_overlap} >= {self.max_chunk_tokens}"
-            )
-        if self.batch_size < 1:
-            raise ValueError(f"batch_size must be positive: {self.batch_size}")
-        if self.log_level not in _VALID_LOG_LEVELS:
-            raise ValueError(f"unknown log_level: {self.log_level}")
+        require_non_empty(self.chroma_host, "chroma_host")
+        require_non_empty(self.collection_name, "collection_name")
+        require_port(self.chroma_port, "chroma_port")
+        require_positive(self.max_chunk_tokens, "max_chunk_tokens")
+        require_in_range(
+            self.token_chunk_overlap,
+            self.max_chunk_tokens,
+            "token_chunk_overlap",
+            "max_chunk_tokens",
+        )
+        require_positive(self.batch_size, "batch_size")
+        require_choice(self.log_level, VALID_LOG_LEVELS, "log_level")
 
     @classmethod
     def from_env(cls, env: dict[str, str] | None = None) -> "Settings":
@@ -93,26 +95,26 @@ class Settings:
         """
         source = os.environ if env is None else env
         return cls(
-            documents_dir=Path(
-                source.get("DOCUMENTS_DIR", DEFAULT_DOCUMENTS_DIR)
+            documents_dir=read_path(
+                source, "DOCUMENTS_DIR", DEFAULT_DOCUMENTS_DIR
             ),
-            chroma_host=source.get("CHROMA_HOST", DEFAULT_CHROMA_HOST),
-            chroma_port=_int(source, "CHROMA_PORT", DEFAULT_CHROMA_PORT),
-            collection_name=source.get(
-                "CHROMA_COLLECTION", DEFAULT_COLLECTION_NAME
+            chroma_host=read_str(source, "CHROMA_HOST", DEFAULT_CHROMA_HOST),
+            chroma_port=read_int(source, "CHROMA_PORT", DEFAULT_CHROMA_PORT),
+            collection_name=read_str(
+                source, "CHROMA_COLLECTION", DEFAULT_COLLECTION_NAME
             ),
-            aws_region=source.get("AWS_REGION", DEFAULT_AWS_REGION),
-            embedding_model_id=source.get(
-                "EMBEDDING_MODEL_ID", DEFAULT_EMBEDDING_MODEL_ID
+            aws_region=read_str(source, "AWS_REGION", DEFAULT_AWS_REGION),
+            embedding_model_id=read_str(
+                source, "EMBEDDING_MODEL_ID", DEFAULT_EMBEDDING_MODEL_ID
             ),
-            max_chunk_tokens=_int(
+            max_chunk_tokens=read_int(
                 source, "MAX_CHUNK_TOKENS", DEFAULT_MAX_CHUNK_TOKENS
             ),
-            token_chunk_overlap=_int(
+            token_chunk_overlap=read_int(
                 source, "TOKEN_CHUNK_OVERLAP", DEFAULT_TOKEN_CHUNK_OVERLAP
             ),
-            batch_size=_int(source, "BATCH_SIZE", DEFAULT_BATCH_SIZE),
-            log_level=source.get("LOG_LEVEL", DEFAULT_LOG_LEVEL).upper(),
+            batch_size=read_int(source, "BATCH_SIZE", DEFAULT_BATCH_SIZE),
+            log_level=read_str(source, "LOG_LEVEL", DEFAULT_LOG_LEVEL).upper(),
         )
 
     def with_overrides(self, **overrides: Any) -> "Settings":
@@ -127,31 +129,5 @@ class Settings:
         Returns:
             A new, validated ``Settings`` instance.
         """
-        effective = {
-            key: value for key, value in overrides.items() if value is not None
-        }
-        return replace(self, **effective)
-
-
-def _int(env: dict[str, str] | Any, key: str, default: int) -> int:
-    """Reads an integer from the environment.
-
-    Args:
-        env: Mapping of variable names to values.
-        key: Name of the variable.
-        default: Value used if the variable is not set.
-
-    Returns:
-        The parsed value or ``default``.
-
-    Raises:
-        ValueError: If the value is not an integer.
-    """
-    raw = env.get(key)
-    if raw is None or raw == "":
-        return default
-    try:
-        return int(raw)
-    except ValueError as exc:
-        raise ValueError(f"{key} is not an integer: {raw!r}") from exc
+        return apply_overrides(self, **overrides)
 

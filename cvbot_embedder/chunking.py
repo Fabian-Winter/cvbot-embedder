@@ -7,13 +7,12 @@ import re
 from collections import defaultdict
 from pathlib import Path
 
-import tiktoken
+from cvbot_core.tokens import ENCODING_NAME, count_tokens
 from langchain_core.documents import Document
 from langchain_text_splitters import MarkdownHeaderTextSplitter, TokenTextSplitter
 
 LOGGER = logging.getLogger(__name__)
 
-ENCODING_NAME = "cl100k_base"
 MARKDOWN_HEADERS = [("#", "h1"), ("##", "h2"), ("###", "h3")]
 
 
@@ -37,7 +36,6 @@ class DocumentChunker:
             token_overlap: Overlap used when splitting oversized chunks.
         """
         self._max_tokens = max_tokens
-        self._encoding = tiktoken.get_encoding(ENCODING_NAME)
         self._markdown_splitter = MarkdownHeaderTextSplitter(
             headers_to_split_on=MARKDOWN_HEADERS,
         )
@@ -63,7 +61,7 @@ class DocumentChunker:
         chunks: list[Document] = []
         for document in documents:
             for chunk in self._split_by_format(document):
-                if self._count_tokens(chunk.page_content) <= self._max_tokens:
+                if count_tokens(chunk.page_content) <= self._max_tokens:
                     chunks.append(chunk)
                 else:
                     chunks.extend(self._token_splitter.split_documents([chunk]))
@@ -134,7 +132,7 @@ class DocumentChunker:
             page_content = paragraph
             if index > 0:
                 candidate = f"{paragraphs[index - 1]}\n\n{paragraph}"
-                if self._count_tokens(candidate) <= self._max_tokens:
+                if count_tokens(candidate) <= self._max_tokens:
                     page_content = candidate
             chunks.append(
                 Document(
@@ -143,17 +141,6 @@ class DocumentChunker:
                 )
             )
         return chunks
-
-    def _count_tokens(self, text: str) -> int:
-        """Counts the tokens of a text.
-
-        Args:
-            text: The text to measure.
-
-        Returns:
-            The token count according to ``cl100k_base``.
-        """
-        return len(self._encoding.encode(text))
 
 
 def _assign_chunk_indices(chunks: list[Document]) -> None:

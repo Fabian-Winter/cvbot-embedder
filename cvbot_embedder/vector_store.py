@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 import chromadb
+from cvbot_core.protocols import VectorStoreWriter
+from cvbot_core.vector_store import create_chroma_client
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
@@ -24,14 +25,8 @@ def create_client(settings: Settings) -> chromadb.ClientAPI:
     Returns:
         The connected Chroma client.
     """
-    LOGGER.info(
-        "connecting to ChromaDB: %s:%d",
-        settings.chroma_host,
-        settings.chroma_port,
-    )
-    return chromadb.HttpClient(
-        host=settings.chroma_host,
-        port=settings.chroma_port,
+    return create_chroma_client(
+        host=settings.chroma_host, port=settings.chroma_port
     )
 
 
@@ -66,11 +61,13 @@ def recreate_collection(
     )
 
 
-def index_chunks(store: Any, chunks: list[Document], batch_size: int) -> int:
+def index_chunks(
+    store: VectorStoreWriter, chunks: list[Document], batch_size: int
+) -> int:
     """Writes chunks to the vector store in batches.
 
     Args:
-        store: Target store exposing an ``add_documents`` method.
+        store: Target store accepting the chunks.
         chunks: The chunks to index.
         batch_size: Number of chunks per write.
 

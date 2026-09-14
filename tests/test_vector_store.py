@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import cvbot_core.vector_store
 import pytest
 
 from cvbot_embedder import vector_store
@@ -21,7 +22,7 @@ def test_create_client_passes_connection_settings(
 ) -> None:
     captured: dict[str, object] = {}
     monkeypatch.setattr(
-        vector_store.chromadb, "HttpClient", lambda **kw: captured.update(kw)
+        cvbot_core.vector_store.chromadb, "HttpClient", lambda **kw: captured.update(kw)
     )
     settings = Settings(chroma_host="chroma.internal", chroma_port=8443)
 

@@ -7,6 +7,8 @@ import logging
 import sys
 from pathlib import Path
 
+from cvbot_core.logging_config import configure_logging
+
 from .config import Settings
 from .pipeline import run
 
@@ -65,10 +67,7 @@ def main(argv: list[str] | None = None) -> int:
             chroma_port=args.chroma_port,
             log_level=args.log_level,
         )
-        logging.basicConfig(
-            level=settings.log_level,
-            format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
-        )
+        configure_logging(settings.log_level)
         result = run(settings)
     except Exception:
         LOGGER.exception("ingestion failed")
