@@ -7,7 +7,7 @@ import logging
 import sys
 from pathlib import Path
 
-from cvbot_core.logging_config import configure_logging
+from cvbot_core.logging_config import VALID_LOG_LEVELS, configure_logging
 
 from .config import Settings
 from .pipeline import run
@@ -42,7 +42,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--chroma-port", type=int, help="port of the ChromaDB")
     parser.add_argument(
         "--log-level",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        choices=sorted(VALID_LOG_LEVELS),
         help="verbosity of the log output (default: LOG_LEVEL or INFO)",
     )
     return parser.parse_args(argv)

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from cvbot_core.logging_config import VALID_LOG_LEVELS
+from cvbot_core.logging_config import DEFAULT_LOG_LEVEL, VALID_LOG_LEVELS
 from cvbot_core.env import read_int, read_path, read_str
 from cvbot_core.overrides import apply_overrides
 from cvbot_core.validation import (
@@ -17,17 +17,18 @@ from cvbot_core.validation import (
     require_port,
     require_positive,
 )
-from cvbot_core.vector_store import DEFAULT_COLLECTION_NAME
+from cvbot_core.vector_store import (
+    DEFAULT_CHROMA_HOST,
+    DEFAULT_CHROMA_PORT,
+    DEFAULT_COLLECTION_NAME,
+)
 
 DEFAULT_DOCUMENTS_DIR = Path(__file__).resolve().parent.parent / "documents"
-DEFAULT_CHROMA_HOST = "localhost"
-DEFAULT_CHROMA_PORT = 8000
 DEFAULT_AWS_REGION = "eu-central-1"
 DEFAULT_EMBEDDING_MODEL_ID = "amazon.titan-embed-text-v2:0"
 DEFAULT_MAX_CHUNK_TOKENS = 512
 DEFAULT_TOKEN_CHUNK_OVERLAP = 50
 DEFAULT_BATCH_SIZE = 50
-DEFAULT_LOG_LEVEL = "INFO"
 
 
 @dataclass(frozen=True)
