@@ -17,9 +17,9 @@ from cvbot_core.validation import (
     require_port,
     require_positive,
 )
+from cvbot_core.vector_store import DEFAULT_COLLECTION_NAME
 
 DEFAULT_DOCUMENTS_DIR = Path(__file__).resolve().parent.parent / "documents"
-DEFAULT_COLLECTION_NAME = "cvbot_documents"
 DEFAULT_CHROMA_HOST = "localhost"
 DEFAULT_CHROMA_PORT = 8000
 DEFAULT_AWS_REGION = "eu-central-1"
