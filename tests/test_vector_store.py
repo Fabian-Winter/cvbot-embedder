@@ -38,11 +38,16 @@ def test_recreate_collection_deletes_existing(
     monkeypatch.setattr(vector_store, "Chroma", lambda **kw: kw)
     client = FakeChromaClient(existing={"jobs"})
 
-    store = vector_store.recreate_collection(client, "jobs", fake_embeddings)
+    store = vector_store.recreate_collection(
+        client, "jobs", fake_embeddings, "amazon.titan-embed-text-v2:0"
+    )
 
     assert client.deleted == ["jobs"]
     assert store["collection_name"] == "jobs"
     assert store["embedding_function"] is fake_embeddings
+    assert store["collection_metadata"] == {
+        "embedding_model_id": "amazon.titan-embed-text-v2:0"
+    }
 
 
 def test_recreate_collection_tolerates_missing_collection(
@@ -51,7 +56,9 @@ def test_recreate_collection_tolerates_missing_collection(
     monkeypatch.setattr(vector_store, "Chroma", lambda **kw: kw)
     client = FakeChromaClient(existing=set())
 
-    store = vector_store.recreate_collection(client, "jobs", fake_embeddings)
+    store = vector_store.recreate_collection(
+        client, "jobs", fake_embeddings, "amazon.titan-embed-text-v2:0"
+    )
 
     assert store["collection_name"] == "jobs"
 

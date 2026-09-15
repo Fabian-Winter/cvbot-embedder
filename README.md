@@ -38,7 +38,7 @@ usually only `CHROMA_HOST` needs to be set.
 | `CHROMA_PORT` | `8000` | Port of the ChromaDB |
 | `CHROMA_COLLECTION` | `cvbot_documents` | Name of the collection |
 | `AWS_REGION` | `eu-central-1` | Region of the Bedrock client |
-| `EMBEDDING_MODEL_ID` | `amazon.titan-embed-text-v2:0` | Bedrock model ID |
+| `EMBEDDING_MODEL_ID` | `amazon.titan-embed-text-v2:0` | Bedrock model ID; stored in the collection metadata so cvbot-retriever picks the matching model |
 | `MAX_CHUNK_TOKENS` | `512` | Maximum number of tokens per chunk |
 | `TOKEN_CHUNK_OVERLAP` | `50` | Overlap used when splitting by tokens |
 | `BATCH_SIZE` | `50` | Chunks per write to ChromaDB |

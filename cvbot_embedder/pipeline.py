@@ -53,7 +53,9 @@ def run(settings: Settings) -> IndexingResult:
     chunks = chunker.split(documents)
 
     client = create_client(settings)
-    store = recreate_collection(client, settings.collection_name, embeddings)
+    store = recreate_collection(
+        client, settings.collection_name, embeddings, settings.embedding_model_id
+    )
     indexed = index_chunks(store, chunks, settings.batch_size)
 
     LOGGER.info(
