@@ -3,6 +3,7 @@ name: Run embedding pipeline
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 env:
   AWS_REGION: ${{ vars.AWS_REGION }}
