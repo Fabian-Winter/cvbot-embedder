@@ -48,6 +48,7 @@ def test_recreate_collection_deletes_existing(
     assert store["collection_metadata"] == {
         "embedding_model_id": "amazon.titan-embed-text-v2:0"
     }
+    assert store["collection_configuration"] == {"hnsw": {"space": "cosine"}}
 
 
 def test_recreate_collection_tolerates_missing_collection(

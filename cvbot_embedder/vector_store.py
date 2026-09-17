@@ -6,7 +6,11 @@ import logging
 
 import chromadb
 from cvbot_core.protocols import VectorStoreWriter
-from cvbot_core.vector_store import EMBEDDING_MODEL_METADATA_KEY, create_chroma_client
+from cvbot_core.vector_store import (
+    DEFAULT_HNSW_SPACE,
+    EMBEDDING_MODEL_METADATA_KEY,
+    create_chroma_client,
+)
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
@@ -41,6 +45,8 @@ def recreate_collection(
     This guarantees that after each run the store contains only the chunks of
     the current document set. The embedding model ID is stored in the
     collection metadata so that cvbot-retriever can pick the matching model.
+    The HNSW distance metric is fixed to cosine, since it is only applied when
+    a collection is created and re-created here on every run.
 
     Args:
         client: The Chroma client.
@@ -62,6 +68,7 @@ def recreate_collection(
         collection_name=collection_name,
         embedding_function=embeddings,
         collection_metadata={EMBEDDING_MODEL_METADATA_KEY: embedding_model_id},
+        collection_configuration={"hnsw": {"space": DEFAULT_HNSW_SPACE}},
     )
 
 
