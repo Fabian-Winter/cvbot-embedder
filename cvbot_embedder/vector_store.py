@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping, Sequence
 
 import chromadb
+from cvbot_core.metadata import encode_schema
 from cvbot_core.protocols import VectorStoreWriter
 from cvbot_core.vector_store import (
     DEFAULT_HNSW_SPACE,
     EMBEDDING_MODEL_METADATA_KEY,
+    METADATA_SCHEMA_METADATA_KEY,
     create_chroma_client,
 )
 from langchain_chroma import Chroma
@@ -39,20 +42,23 @@ def recreate_collection(
     collection_name: str,
     embeddings: Embeddings,
     embedding_model_id: str,
+    metadata_schema: Mapping[str, Sequence[str]] | None = None,
 ) -> Chroma:
     """Drops an existing collection and creates it again.
 
     This guarantees that after each run the store contains only the chunks of
     the current document set. The embedding model ID is stored in the
-    collection metadata so that cvbot-retriever can pick the matching model.
-    The HNSW distance metric is fixed to cosine, since it is only applied when
-    a collection is created and re-created here on every run.
+    collection metadata so that cvbot-retriever can pick the matching model,
+    and the observed section metadata schema so that it knows which fields it
+    may filter on. The HNSW distance metric is fixed to cosine, since it is
+    only applied when a collection is created and re-created here on every run.
 
     Args:
         client: The Chroma client.
         collection_name: Name of the collection.
         embeddings: Embedding model used by the store.
         embedding_model_id: Bedrock model ID the embeddings were built with.
+        metadata_schema: Section metadata fields observed while chunking.
 
     Returns:
         The empty, writable vector store.
@@ -67,7 +73,10 @@ def recreate_collection(
         client=client,
         collection_name=collection_name,
         embedding_function=embeddings,
-        collection_metadata={EMBEDDING_MODEL_METADATA_KEY: embedding_model_id},
+        collection_metadata={
+            EMBEDDING_MODEL_METADATA_KEY: embedding_model_id,
+            METADATA_SCHEMA_METADATA_KEY: encode_schema(metadata_schema or {}),
+        },
         collection_configuration={"hnsw": {"space": DEFAULT_HNSW_SPACE}},
     )
 

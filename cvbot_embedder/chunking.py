@@ -11,6 +11,13 @@ from cvbot_core.tokens import ENCODING_NAME, count_tokens
 from langchain_core.documents import Document
 from langchain_text_splitters import MarkdownHeaderTextSplitter, TokenTextSplitter
 
+from .metadata import (
+    YEARS_KEY,
+    derive_year_values,
+    render_metadata_line,
+    split_metadata_block,
+)
+
 LOGGER = logging.getLogger(__name__)
 
 MARKDOWN_HEADERS = [("#", "h1"), ("##", "h2"), ("###", "h3")]
@@ -93,21 +100,39 @@ class DocumentChunker:
     def _split_markdown(self, document: Document) -> list[Document]:
         """Splits Markdown and keeps the active header path with each chunk.
 
+        Metadata blocks are consumed per section and inherited downwards, so a
+        field set once below the ``#`` heading applies to every section of the
+        file unless a deeper section overrides it.
+
         Args:
             document: The Markdown document to split.
 
         Returns:
-            The chunks with original and header metadata.
+            The chunks with original, inherited and header metadata.
         """
         split_documents = self._markdown_splitter.split_text(document.page_content)
+        inherited: dict[int, dict[str, str]] = {}
         chunks: list[Document] = []
         for split_document in split_documents:
-            metadata = {**document.metadata, **split_document.metadata}
-            header_context = _format_header_context(split_document.metadata)
-            page_content = split_document.page_content.strip()
-            if header_context:
-                page_content = f"{header_context}\n\n{page_content}"
-            chunks.append(Document(page_content=page_content, metadata=metadata))
+            section_metadata, body = split_metadata_block(
+                split_document.page_content
+            )
+            depth = _header_depth(split_document.metadata)
+            _reset_below(inherited, depth)
+            inherited[depth] = section_metadata
+
+            metadata: dict[str, object] = {**document.metadata}
+            for level in sorted(inherited):
+                metadata.update(inherited[level])
+            metadata.update(split_document.metadata)
+            _add_derived_years(metadata)
+
+            chunks.append(
+                Document(
+                    page_content=_build_page_content(metadata, body),
+                    metadata=metadata,
+                )
+            )
         return chunks or [document]
 
     def _split_plaintext(self, document: Document) -> list[Document]:
@@ -171,3 +196,63 @@ def _format_header_context(metadata: dict[str, object]) -> str:
         if isinstance(value, str) and value:
             lines.append(f"{marker} {value}")
     return "\n".join(lines)
+
+
+def _header_depth(header_metadata: dict[str, str]) -> int:
+    """Determines how deep a split sits in the header hierarchy.
+
+    Args:
+        header_metadata: Header metadata from ``MarkdownHeaderTextSplitter``.
+
+    Returns:
+        The depth, where ``0`` is the document preamble before the first
+        heading.
+    """
+    return sum(1 for _, key in MARKDOWN_HEADERS if header_metadata.get(key))
+
+
+def _reset_below(inherited: dict[int, dict[str, str]], depth: int) -> None:
+    """Drops the metadata of the previous branch when a sibling section starts.
+
+    Args:
+        inherited: Metadata per header depth.
+        depth: Depth of the section that is about to be processed.
+    """
+    for level in [level for level in inherited if level >= depth]:
+        del inherited[level]
+
+
+def _add_derived_years(metadata: dict[str, object]) -> None:
+    """Adds the ``jahre`` field derived from an inherited ``von``/``bis`` period.
+
+    Args:
+        metadata: The merged metadata of the chunk, modified in place.
+    """
+    period = {
+        key: value for key, value in metadata.items() if isinstance(value, str)
+    }
+    years = derive_year_values(period)
+    if years:
+        metadata[YEARS_KEY] = years
+
+
+def _build_page_content(metadata: dict[str, object], body: str) -> str:
+    """Prepends the header path and the metadata line to the section body.
+
+    Args:
+        metadata: The merged metadata of the chunk.
+        body: The section text without its metadata block.
+
+    Returns:
+        The embeddable chunk text.
+    """
+    fields = {
+        key: value for key, value in metadata.items() if isinstance(value, str)
+    }
+    parts = [
+        part
+        for part in (_format_header_context(metadata), render_metadata_line(fields))
+        if part
+    ]
+    parts.append(body)
+    return "\n\n".join(part for part in parts if part)

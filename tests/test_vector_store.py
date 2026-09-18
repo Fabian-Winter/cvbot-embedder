@@ -46,9 +46,30 @@ def test_recreate_collection_deletes_existing(
     assert store["collection_name"] == "jobs"
     assert store["embedding_function"] is fake_embeddings
     assert store["collection_metadata"] == {
-        "embedding_model_id": "amazon.titan-embed-text-v2:0"
+        "embedding_model_id": "amazon.titan-embed-text-v2:0",
+        "metadata_schema": "{}",
     }
     assert store["collection_configuration"] == {"hnsw": {"space": "cosine"}}
+
+
+def test_recreate_collection_publishes_the_metadata_schema(
+    monkeypatch: pytest.MonkeyPatch, fake_embeddings: FakeEmbeddings
+) -> None:
+    monkeypatch.setattr(vector_store, "Chroma", lambda **kw: kw)
+    client = FakeChromaClient(existing=set())
+
+    store = vector_store.recreate_collection(
+        client,
+        "jobs",
+        fake_embeddings,
+        "amazon.titan-embed-text-v2:0",
+        {"status": ["historisch", "aktuell"]},
+    )
+
+    assert (
+        store["collection_metadata"]["metadata_schema"]
+        == '{"status":["aktuell","historisch"]}'
+    )
 
 
 def test_recreate_collection_tolerates_missing_collection(

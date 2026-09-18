@@ -9,10 +9,47 @@ indexes them in a ChromaDB running as a container on AWS Fargate.
 1. **Load** – all `.txt` and `.md` files from the configured directory.
 2. **Format-aware chunking** – Markdown files split by headers and text files
   split by paragraphs with adjacent paragraph overlap.
-3. **Token splitting** – only chunks exceeding `MAX_CHUNK_TOKENS` are split
+3. **Metadata parsing** – the `> key: value` block below a heading becomes
+   structured chunk metadata (see below).
+4. **Token splitting** – only chunks exceeding `MAX_CHUNK_TOKENS` are split
    further with `TokenTextSplitter` (`cl100k_base`).
-4. **Indexing** – the target collection is dropped and recreated, then the
-   chunks are written in batches.
+5. **Indexing** – the target collection is dropped and recreated, then the
+   chunks are written in batches. The observed metadata schema is stored in the
+   collection metadata so that cvbot-retriever knows which fields it may filter
+   on.
+
+## Section metadata
+
+A section may declare metadata in blockquote lines directly below its heading,
+one field per line:
+
+```markdown
+## ACME Inc.
+> type: employer
+> status: historic
+> location: Berlin
+> from: 2011-10
+> to: 2022-10
+
+Actual chunk text...
+```
+
+- Only the **leading** run of blockquote lines is parsed. A block below an
+  `####` heading is ignored, because `####` is not a split boundary.
+- Keys are normalized (lowercase, umlauts folded, `Tech-Stack` → `tech_stack`).
+- Values are split on `,` and `;`, so `> tech: Java, Maven` is matched by a
+  filter for either value. Never put prose into a metadata line.
+- Fields cascade downwards: a field set below `#` applies to every section of
+  the file until a deeper section overrides it.
+- `years` is derived automatically from `from`/`to` (`to: ongoing` runs up to
+  the current year) and is the field that makes a question about a single year
+  matchable. A manually maintained `years` always wins.
+- Malformed lines are skipped with a log entry; a section without any metadata
+  is indexed exactly as before.
+- `source`, `filename`, `chunk_index` and `h1`–`h3` are reserved and cannot be
+  overwritten.
+- Metadata is also rendered back into the chunk text as a compact line, so the
+  values remain semantically searchable.
 
 ## Setup
 
@@ -85,6 +122,7 @@ cvbot_embedder/
   config.py        Settings from environment variables
   loader.py        Document loading
   chunking.py      Semantic chunking + token splitting
+  metadata.py      `> key: value` parsing, year derivation, schema collection
   embeddings.py    Bedrock embedding model
   vector_store.py  ChromaDB client, collection, indexing
   pipeline.py      Orchestration
@@ -95,3 +133,4 @@ cvbot_embedder/
 
 - Token counting uses `cl100k_base` as an approximation of the Titan tokenizer.
 - ChromaDB is deleted and recreated on every run.
+- Metadata blocks are only recognised below `#`, `##` and `###` headings.

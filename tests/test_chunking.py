@@ -135,3 +135,90 @@ def test_content_is_not_lost() -> None:
     joined = " ".join(chunk.page_content for chunk in chunks)
     assert "First sentence" in joined
     assert "Third sentence" in joined
+
+
+def test_markdown_without_metadata_lines_is_unchanged() -> None:
+    documents = make_documents(
+        "# Handbook\n\nIntro text.\n\n## Vacation\n\nVacation policy.",
+        source="handbook.md",
+    )
+
+    chunks = build_chunker().split(documents)
+
+    assert chunks[1].page_content == "# Handbook\n## Vacation\n\nVacation policy."
+    assert set(chunks[1].metadata) == {"source", "filename", "h1", "h2", "chunk_index"}
+
+
+def test_section_metadata_becomes_chunk_metadata() -> None:
+    documents = make_documents(
+        "# Arbeitgeber\n\n## IAV GmbH\n> status: Historisch\n> ort: Berlin\n\nText.",
+        source="cv.md",
+    )
+
+    chunks = build_chunker().split(documents)
+
+    assert chunks[-1].metadata["status"] == "Historisch"
+    assert chunks[-1].metadata["ort"] == "Berlin"
+
+
+def test_metadata_lines_are_replaced_by_a_compact_line() -> None:
+    documents = make_documents(
+        "# Arbeitgeber\n> status: Historisch\n> ort: Berlin\n\nText.",
+        source="cv.md",
+    )
+
+    chunks = build_chunker().split(documents)
+
+    assert chunks[0].page_content == (
+        "# Arbeitgeber\n\nort: Berlin | status: Historisch\n\nText."
+    )
+
+
+def test_section_metadata_is_inherited_by_subsections() -> None:
+    documents = make_documents(
+        "# Projekte\n> typ: projekt\n\n## Beruf\n> kontext: beruf\n\n"
+        "### Erstes\n> rolle: Architekt\n\nText.",
+        source="cv.md",
+    )
+
+    chunks = build_chunker().split(documents)
+
+    assert chunks[-1].metadata["typ"] == "projekt"
+    assert chunks[-1].metadata["kontext"] == "beruf"
+    assert chunks[-1].metadata["rolle"] == "Architekt"
+
+
+def test_sibling_sections_do_not_inherit_from_each_other() -> None:
+    documents = make_documents(
+        "# Projekte\n\n## Erstes\n> rolle: Architekt\n\nText.\n\n"
+        "## Zweites\n> ort: Berlin\n\nText.",
+        source="cv.md",
+    )
+
+    chunks = build_chunker().split(documents)
+
+    assert "rolle" not in chunks[-1].metadata
+    assert chunks[-1].metadata["ort"] == "Berlin"
+
+
+def test_deeper_section_overrides_an_inherited_field() -> None:
+    documents = make_documents(
+        "# Projekte\n> status: Historisch\n\n## Aktuelles\n> status: Aktuell\n\nText.",
+        source="cv.md",
+    )
+
+    chunks = build_chunker().split(documents)
+
+    assert chunks[-1].metadata["status"] == "Aktuell"
+
+
+def test_years_are_derived_from_an_inherited_period() -> None:
+    documents = make_documents(
+        "# Projekte\n> von: 2011-10\n> bis: 2013-05\n\n## Erstes\n\nText.",
+        source="cv.md",
+    )
+
+    chunks = build_chunker().split(documents)
+
+    assert chunks[-1].metadata["jahre"] == "2011, 2012, 2013"
+    assert "jahre: 2011, 2012, 2013" in chunks[-1].page_content

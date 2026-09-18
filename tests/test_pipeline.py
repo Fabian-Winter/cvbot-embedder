@@ -30,7 +30,9 @@ def patched_pipeline(
     monkeypatch.setattr(pipeline, "build_embeddings", lambda s: fake_embeddings)
     monkeypatch.setattr(pipeline, "create_client", lambda s: client)
     monkeypatch.setattr(
-        pipeline, "recreate_collection", lambda c, name, emb, model_id: store
+        pipeline,
+        "recreate_collection",
+        lambda c, name, emb, model_id, schema=None: store,
     )
     return store
 
