@@ -214,11 +214,11 @@ def test_deeper_section_overrides_an_inherited_field() -> None:
 
 def test_years_are_derived_from_an_inherited_period() -> None:
     documents = make_documents(
-        "# Projekte\n> von: 2011-10\n> bis: 2013-05\n\n## Erstes\n\nText.",
+        "# Projekte\n> from: 2011-10\n> to: 2013-05\n\n## Erstes\n\nText.",
         source="cv.md",
     )
 
     chunks = build_chunker().split(documents)
 
-    assert chunks[-1].metadata["jahre"] == "2011, 2012, 2013"
-    assert "jahre: 2011, 2012, 2013" in chunks[-1].page_content
+    assert chunks[-1].metadata["years"] == "2011, 2012, 2013"
+    assert "years: 2011, 2012, 2013" in chunks[-1].page_content

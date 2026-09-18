@@ -27,12 +27,12 @@ LOGGER = logging.getLogger(__name__)
 
 METADATA_LINE = re.compile(r"^>\s*(?P<key>[^:]+?)\s*:\s*(?P<value>.*?)\s*$")
 
-PERIOD_START_KEY = "von"
-PERIOD_END_KEY = "bis"
-YEARS_KEY = "jahre"
+PERIOD_START_KEY = "from"
+PERIOD_END_KEY = "to"
+YEARS_KEY = "years"
 
-# Values of ``bis`` that mean "still running" rather than a concrete end date.
-OPEN_PERIOD_MARKERS = frozenset({"", "-", "laufend", "heute", "jetzt", "aktuell"})
+# Values of ``to`` that mean "still running" rather than a concrete end date.
+OPEN_PERIOD_MARKERS = frozenset({"", "-", "laufend", "heute", "jetzt", "aktuell", "today", "now", "current", "present"})
 
 # Guards against a typo turning one section into a hundred filterable years.
 MAX_DERIVED_YEARS = 60
@@ -110,7 +110,7 @@ def render_metadata_line(metadata: Mapping[str, str]) -> str:
 
 
 def derive_year_values(metadata: Mapping[str, str]) -> str | None:
-    """Expands a ``von``/``bis`` period into the list of covered years.
+    """Expands a ``from``/``to`` period into the list of covered years.
 
     Filtering only compares values, so a period is unusable as a filter while a
     year list matches a question about a single year directly.
@@ -120,7 +120,7 @@ def derive_year_values(metadata: Mapping[str, str]) -> str | None:
 
     Returns:
         The comma-separated years, or ``None`` if nothing can be derived or a
-        ``jahre`` field is already maintained by hand.
+        ``years`` field is already maintained by hand.
     """
     if metadata.get(YEARS_KEY):
         return None
@@ -230,7 +230,7 @@ def _resolve_period_end(raw: str | None, start: int) -> int:
     """Determines the last year of a period.
 
     Args:
-        raw: The raw ``bis`` value, if present.
+        raw: The raw ``to`` value, if present.
         start: The already parsed first year, used as the conservative fallback.
 
     Returns:
