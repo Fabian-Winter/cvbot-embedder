@@ -16,9 +16,13 @@ from datetime import UTC, datetime
 from cvbot_core.metadata import (
     MAX_SCHEMA_FIELDS,
     MAX_VALUES_PER_FIELD,
+    OPEN_PERIOD_MARKERS,
+    PERIOD_END_KEY,
+    PERIOD_START_KEY,
     RESERVED_METADATA_KEYS,
     normalize_key,
     normalize_value,
+    parse_period_year,
     split_values,
 )
 from langchain_core.documents import Document
@@ -27,17 +31,10 @@ LOGGER = logging.getLogger(__name__)
 
 METADATA_LINE = re.compile(r"^>\s*(?P<key>[^:]+?)\s*:\s*(?P<value>.*?)\s*$")
 
-PERIOD_START_KEY = "from"
-PERIOD_END_KEY = "to"
 YEARS_KEY = "years"
-
-# Values of ``to`` that mean "still running" rather than a concrete end date.
-OPEN_PERIOD_MARKERS = frozenset({"", "-", "laufend", "heute", "jetzt", "aktuell", "today", "now", "current", "present"})
 
 # Guards against a typo turning one section into a hundred filterable years.
 MAX_DERIVED_YEARS = 60
-
-_YEAR = re.compile(r"\b(\d{4})\b")
 
 
 def split_metadata_block(text: str) -> tuple[dict[str, str], str]:
@@ -125,7 +122,7 @@ def derive_year_values(metadata: Mapping[str, str]) -> str | None:
     if metadata.get(YEARS_KEY):
         return None
 
-    start = _parse_period_bound(metadata.get(PERIOD_START_KEY))
+    start = parse_period_year(metadata.get(PERIOD_START_KEY))
     if start is None:
         LOGGER.debug("no usable %r field, skipping year derivation", PERIOD_START_KEY)
         return None
@@ -208,24 +205,6 @@ def _apply_caps(observed: dict[str, list[str]]) -> dict[str, list[str]]:
     return schema
 
 
-def _parse_period_bound(raw: str | None) -> int | None:
-    """Reads the year out of a period bound.
-
-    Accepts ``2011``, ``2011-10``, ``2011-10-01`` and prose like
-    ``Oktober 2011``.
-
-    Args:
-        raw: The raw field value, if present.
-
-    Returns:
-        The year, or ``None`` if the value carries none.
-    """
-    if not raw:
-        return None
-    match = _YEAR.search(raw)
-    return int(match.group(1)) if match else None
-
-
 def _resolve_period_end(raw: str | None, start: int) -> int:
     """Determines the last year of a period.
 
@@ -239,7 +218,7 @@ def _resolve_period_end(raw: str | None, start: int) -> int:
     if raw is None or normalize_value(raw) in OPEN_PERIOD_MARKERS:
         return max(start, _current_year())
 
-    end = _parse_period_bound(raw)
+    end = parse_period_year(raw)
     if end is None:
         LOGGER.debug("unparsable %r value %r, assuming a single year", PERIOD_END_KEY, raw)
         return start
