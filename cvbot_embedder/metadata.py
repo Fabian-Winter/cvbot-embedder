@@ -16,13 +16,12 @@ from datetime import UTC, datetime
 from cvbot_core.metadata import (
     MAX_SCHEMA_FIELDS,
     MAX_VALUES_PER_FIELD,
-    OPEN_PERIOD_MARKERS,
     PERIOD_END_KEY,
     PERIOD_START_KEY,
     RESERVED_METADATA_KEYS,
     normalize_key,
-    normalize_value,
     parse_period_year,
+    period_end_year,
     split_values,
 )
 from langchain_core.documents import Document
@@ -127,7 +126,7 @@ def derive_year_values(metadata: Mapping[str, str]) -> str | None:
         LOGGER.debug("no usable %r field, skipping year derivation", PERIOD_START_KEY)
         return None
 
-    end = _resolve_period_end(metadata.get(PERIOD_END_KEY), start)
+    end = _resolve_period_end(metadata, start)
     if end < start:
         LOGGER.warning("period ends before it starts (%d..%d), swapping", start, end)
         start, end = end, start
@@ -205,22 +204,24 @@ def _apply_caps(observed: dict[str, list[str]]) -> dict[str, list[str]]:
     return schema
 
 
-def _resolve_period_end(raw: str | None, start: int) -> int:
+def _resolve_period_end(metadata: Mapping[str, str], start: int) -> int:
     """Determines the last year of a period.
 
+    Delegates to the shared rule in cvbot_core so that the published year
+    lists and the query-time recency ranking of cvbot-retriever always agree
+    on when a period ends.
+
     Args:
-        raw: The raw ``to`` value, if present.
+        metadata: The parsed fields of the chunk.
         start: The already parsed first year, used as the conservative fallback.
 
     Returns:
         The last year of the period.
     """
-    if raw is None or normalize_value(raw) in OPEN_PERIOD_MARKERS:
-        return max(start, _current_year())
-
-    end = parse_period_year(raw)
+    end = period_end_year(metadata, _current_year())
     if end is None:
-        LOGGER.debug("unparsable %r value %r, assuming a single year", PERIOD_END_KEY, raw)
+        # Unreachable while a start year exists; kept as the conservative
+        # fallback the single-year rule always had.
         return start
     return end
 
