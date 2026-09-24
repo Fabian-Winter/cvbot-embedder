@@ -90,17 +90,17 @@ def test_render_metadata_line_is_empty_without_fields() -> None:
 
 
 def test_derive_year_values_expands_a_closed_period() -> None:
-    years = derive_year_values({"from": "2011-10", "to": "2014-10"})
+    years = derive_year_values({"startdate": "2011-10", "enddate": "2014-10"})
 
     assert years == "2011, 2012, 2013, 2014"
 
 
 def test_derive_year_values_accepts_plain_years_and_full_dates() -> None:
-    assert derive_year_values({"from": "2011", "to": "2012-03-01"}) == "2011, 2012"
+    assert derive_year_values({"startdate": "2011", "enddate": "2012-03-01"}) == "2011, 2012"
 
 
 def test_derive_year_values_reads_years_out_of_prose() -> None:
-    assert derive_year_values({"from": "Oktober 2011", "to": "Mai 2012"}) == (
+    assert derive_year_values({"startdate": "Oktober 2011", "enddate": "Mai 2012"}) == (
         "2011, 2012"
     )
 
@@ -110,7 +110,7 @@ def test_derive_year_values_runs_until_the_current_year_when_open(
 ) -> None:
     monkeypatch.setattr(metadata, "_current_year", lambda: 2013)
 
-    assert derive_year_values({"from": "2011", "to": "laufend"}) == "2011, 2012, 2013"
+    assert derive_year_values({"startdate": "2011", "enddate": "laufend"}) == "2011, 2012, 2013"
 
 
 def test_derive_year_values_treats_a_missing_end_as_open(
@@ -118,19 +118,19 @@ def test_derive_year_values_treats_a_missing_end_as_open(
 ) -> None:
     monkeypatch.setattr(metadata, "_current_year", lambda: 2012)
 
-    assert derive_year_values({"from": "2011"}) == "2011, 2012"
+    assert derive_year_values({"startdate": "2011"}) == "2011, 2012"
 
 
 def test_derive_year_values_falls_back_to_a_single_year_for_an_unparsable_end() -> None:
-    assert derive_year_values({"from": "2011", "to": "irgendwann"}) == "2011"
+    assert derive_year_values({"startdate": "2011", "enddate": "irgendwann"}) == "2011"
 
 
 def test_derive_year_values_swaps_reversed_bounds() -> None:
-    assert derive_year_values({"from": "2014", "to": "2012"}) == "2012, 2013, 2014"
+    assert derive_year_values({"startdate": "2014", "enddate": "2012"}) == "2012, 2013, 2014"
 
 
 def test_derive_year_values_caps_an_implausible_period() -> None:
-    years = derive_year_values({"from": "1900", "to": "2020"})
+    years = derive_year_values({"startdate": "1900", "enddate": "2020"})
 
     assert years is not None
     assert len(years.split(", ")) == metadata.MAX_DERIVED_YEARS
@@ -138,12 +138,12 @@ def test_derive_year_values_caps_an_implausible_period() -> None:
 
 
 def test_derive_year_values_keeps_a_manually_maintained_field() -> None:
-    assert derive_year_values({"years": "2011", "from": "2011", "to": "2014"}) is None
+    assert derive_year_values({"years": "2011", "startdate": "2011", "enddate": "2014"}) is None
 
 
 def test_derive_year_values_returns_none_without_a_start() -> None:
-    assert derive_year_values({"to": "2014"}) is None
-    assert derive_year_values({"from": "unbekannt", "to": "2014"}) is None
+    assert derive_year_values({"enddate": "2014"}) is None
+    assert derive_year_values({"startdate": "unbekannt", "enddate": "2014"}) is None
 
 
 def test_collect_schema_gathers_the_observed_values() -> None:

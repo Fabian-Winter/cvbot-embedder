@@ -223,7 +223,7 @@ def _reset_below(inherited: dict[int, dict[str, str]], depth: int) -> None:
 
 
 def _add_derived_years(metadata: dict[str, object]) -> None:
-    """Adds the ``years`` field derived from an inherited ``from``/``to`` period.
+    """Adds the ``years`` field derived from an inherited ``startdate``/``enddate`` period.
 
     Args:
         metadata: The merged metadata of the chunk, modified in place.

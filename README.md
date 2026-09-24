@@ -41,7 +41,7 @@ Actual chunk text...
   filter for either value. Never put prose into a metadata line.
 - Fields cascade downwards: a field set below `#` applies to every section of
   the file until a deeper section overrides it.
-- `years` is derived automatically from `from`/`to` (`to: ongoing` runs up to
+- `years` is derived automatically from `startdate`/`enddate` (`to: ongoing` runs up to
   the current year) and is the field that makes a question about a single year
   matchable. A manually maintained `years` always wins.
 - Malformed lines are skipped with a log entry; a section without any metadata

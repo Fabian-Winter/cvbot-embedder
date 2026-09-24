@@ -106,7 +106,7 @@ def render_metadata_line(metadata: Mapping[str, str]) -> str:
 
 
 def derive_year_values(metadata: Mapping[str, str]) -> str | None:
-    """Expands a ``from``/``to`` period into the list of covered years.
+    """Expands a ``startdate``/``enddate`` period into the list of covered years.
 
     Filtering only compares values, so a period is unusable as a filter while a
     year list matches a question about a single year directly.
