@@ -108,7 +108,7 @@ def test_derive_year_values_reads_years_out_of_prose() -> None:
 def test_derive_year_values_runs_until_the_current_year_when_open(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(metadata, "_current_year", lambda: 2013)
+    monkeypatch.setattr(metadata, "current_year", lambda: 2013)
 
     assert derive_year_values({"startdate": "2011", "enddate": "laufend"}) == "2011, 2012, 2013"
 
@@ -116,7 +116,7 @@ def test_derive_year_values_runs_until_the_current_year_when_open(
 def test_derive_year_values_treats_a_missing_end_as_open(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(metadata, "_current_year", lambda: 2012)
+    monkeypatch.setattr(metadata, "current_year", lambda: 2012)
 
     assert derive_year_values({"startdate": "2011"}) == "2011, 2012"
 

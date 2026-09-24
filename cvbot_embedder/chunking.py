@@ -18,6 +18,13 @@ from .metadata import (
     split_metadata_block,
 )
 
+from cvbot_core.metadata import (
+    IS_CURRENT_KEY,
+    PERIOD_START_KEY,
+    current_year,
+    split_values,
+)
+
 LOGGER = logging.getLogger(__name__)
 
 MARKDOWN_HEADERS = [("#", "h1"), ("##", "h2"), ("###", "h3")]
@@ -126,6 +133,7 @@ class DocumentChunker:
                 metadata.update(inherited[level])
             metadata.update(split_document.metadata)
             _add_derived_years(metadata)
+            _add_is_current(metadata)
 
             chunks.append(
                 Document(
@@ -234,6 +242,24 @@ def _add_derived_years(metadata: dict[str, object]) -> None:
     years = derive_year_values(period)
     if years:
         metadata[YEARS_KEY] = years
+
+
+def _add_is_current(metadata: dict[str, object]) -> None:
+    """Adds the ``iscurrent`` field derived from an inherited ``startdate``/``enddate`` period.
+
+    A manually maintained ``isCurrent`` always wins, mirroring the rule for
+    ``years``. The value is written as the string ``"true"`` or ``"false"``
+    so that it survives schema collection and boosting, which both only
+    consider string values.
+
+    Args:
+        metadata: The merged metadata of the chunk, modified in place.
+    """
+    if IS_CURRENT_KEY in metadata or PERIOD_START_KEY not in metadata:
+        return
+    years = metadata.get(YEARS_KEY, "")
+    values = split_values(years) if isinstance(years, str) else []
+    metadata[IS_CURRENT_KEY] = "true" if str(current_year()) in values else "false"
 
 
 def _build_page_content(metadata: dict[str, object], body: str) -> str:

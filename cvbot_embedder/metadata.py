@@ -11,7 +11,6 @@ from __future__ import annotations
 import logging
 import re
 from collections.abc import Mapping
-from datetime import UTC, datetime
 
 from cvbot_core.metadata import (
     MAX_SCHEMA_FIELDS,
@@ -23,6 +22,7 @@ from cvbot_core.metadata import (
     parse_period_year,
     period_end_year,
     split_values,
+    current_year,
 )
 from langchain_core.documents import Document
 
@@ -218,17 +218,12 @@ def _resolve_period_end(metadata: Mapping[str, str], start: int) -> int:
     Returns:
         The last year of the period.
     """
-    end = period_end_year(metadata, _current_year())
+    end = period_end_year(metadata, current_year())
     if end is None:
         # Unreachable while a start year exists; kept as the conservative
         # fallback the single-year rule always had.
         return start
     return end
-
-
-def _current_year() -> int:
-    """Returns the current year; separated out so tests can pin it."""
-    return datetime.now(UTC).year
 
 
 def _warn_about_trailing_metadata(body: str) -> None:

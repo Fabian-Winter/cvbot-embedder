@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import pytest
 import tiktoken
 
+from cvbot_embedder import chunking
 from cvbot_embedder.chunking import ENCODING_NAME, DocumentChunker
 from tests.conftest import collect_metadata, make_documents
 
@@ -21,6 +23,11 @@ def build_chunker(max_tokens: int = 64) -> DocumentChunker:
         max_tokens=max_tokens,
         token_overlap=4,
     )
+
+
+def pin_year(monkeypatch: pytest.MonkeyPatch, year: int) -> None:
+    """Pins the year the ``iscurrent`` marker is derived against."""
+    monkeypatch.setattr(chunking, "current_year", lambda: year)
 
 
 def test_empty_input_returns_empty_list() -> None:
@@ -214,7 +221,7 @@ def test_deeper_section_overrides_an_inherited_field() -> None:
 
 def test_years_are_derived_from_an_inherited_period() -> None:
     documents = make_documents(
-        "# Projekte\n> from: 2011-10\n> to: 2013-05\n\n## Erstes\n\nText.",
+        "# Projekte\n> startdate: 2011-10\n> enddate: 2013-05\n\n## Erstes\n\nText.",
         source="cv.md",
     )
 
@@ -222,3 +229,70 @@ def test_years_are_derived_from_an_inherited_period() -> None:
 
     assert chunks[-1].metadata["years"] == "2011, 2012, 2013"
     assert "years: 2011, 2012, 2013" in chunks[-1].page_content
+
+
+def test_is_current_is_true_for_an_open_period(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pin_year(monkeypatch, 2026)
+    documents = make_documents(
+        "# Arbeitgeber\n> startdate: 2022-10\n> enddate: laufend\n\nText.",
+        source="cv.md",
+    )
+
+    chunks = build_chunker().split(documents)
+
+    assert chunks[-1].metadata["iscurrent"] == "true"
+
+
+def test_is_current_is_true_when_the_period_covers_this_year(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pin_year(monkeypatch, 2026)
+    documents = make_documents(
+        "# Arbeitgeber\n> startdate: 2025\n> enddate: 2026\n\nText.",
+        source="cv.md",
+    )
+
+    chunks = build_chunker().split(documents)
+
+    assert chunks[-1].metadata["iscurrent"] == "true"
+
+
+def test_is_current_is_false_for_a_closed_period(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pin_year(monkeypatch, 2026)
+    documents = make_documents(
+        "# Arbeitgeber\n> startdate: 2011\n> enddate: 2013\n\nText.",
+        source="cv.md",
+    )
+
+    chunks = build_chunker().split(documents)
+
+    assert chunks[-1].metadata["iscurrent"] == "false"
+
+
+def test_a_manually_maintained_is_current_wins(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pin_year(monkeypatch, 2026)
+    documents = make_documents(
+        "# Arbeitgeber\n> isCurrent: true\n> startdate: 2011\n> enddate: 2013\n\nText.",
+        source="cv.md",
+    )
+
+    chunks = build_chunker().split(documents)
+
+    assert chunks[-1].metadata["iscurrent"] == "true"
+
+
+def test_is_current_is_absent_without_a_startdate() -> None:
+    documents = make_documents(
+        "# Arbeitgeber\n> status: Historisch\n\nText.",
+        source="cv.md",
+    )
+
+    chunks = build_chunker().split(documents)
+
+    assert "iscurrent" not in chunks[-1].metadata
