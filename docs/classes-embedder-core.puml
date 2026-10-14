@@ -46,4 +46,6 @@ vstore ..> VectorStoreWriter : writes through
 metadata ..> coreMeta
 DocumentChunker ..> coreMeta
 DocumentChunker ..> coreTok
+
+remove @unlinked
 @enduml

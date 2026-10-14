@@ -20,4 +20,6 @@ note bottom of Settings
   Settings is passed to pipeline, embeddings
   and vector_store as the only configuration.
 end note
+
+remove @unlinked
 @enduml

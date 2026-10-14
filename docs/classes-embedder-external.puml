@@ -35,4 +35,6 @@ vstore ..> VectorStoreWriter : writes through
 Chroma ..|> VectorStoreWriter
 Chroma o-- Embeddings
 Chroma o-- ClientAPI
+
+remove @unlinked
 @enduml
