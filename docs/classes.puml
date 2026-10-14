@@ -1,0 +1,147 @@
+@startuml
+skinparam classAttributeIconSize 0
+hide empty members
+
+package "cvbot_embedder" {
+  class "__main__" as main <<module>> {
+    +main(argv): int
+    -_parse_args(argv): Namespace
+  }
+
+  class "pipeline" as pipeline <<module>> {
+    +run(settings: Settings): IndexingResult
+  }
+
+  class IndexingResult <<frozen dataclass>> {
+    +documents: int
+    +chunks: int
+    +collection: str
+    +metadata_fields: int
+  }
+
+  class Settings <<frozen dataclass>> {
+    +documents_dir: Path
+    +chroma_host: str
+    +chroma_port: int
+    +collection_name: str
+    +aws_region: str
+    +embedding_model_id: str
+    +max_chunk_tokens: int
+    +token_chunk_overlap: int
+    +batch_size: int
+    +log_level: str
+    +__post_init__()
+    +{static} from_env(env): Settings
+    +with_overrides(**overrides): Settings
+  }
+
+  class "loader" as loader <<module>> {
+    +load_documents(directory: Path): list[Document]
+  }
+
+  class DocumentChunker {
+    -_max_tokens: int
+    -_markdown_splitter
+    -_token_splitter
+    +__init__(max_tokens, token_overlap)
+    +split(documents): list[Document]
+    -_split_by_format(document): list[Document]
+    -_split_markdown(document): list[Document]
+    -_split_plaintext(document): list[Document]
+  }
+
+  class "metadata" as metadata <<module>> {
+    +split_metadata_block(text): tuple[dict, str]
+    +render_metadata_line(metadata): str
+    +derive_year_values(metadata): str | None
+    +collect_schema(chunks): dict[str, list[str]]
+  }
+
+  class "embeddings" as embeddings <<module>> {
+    +build_embeddings(settings): Embeddings
+  }
+
+  class "vector_store" as vstore <<module>> {
+    +create_client(settings): ClientAPI
+    +recreate_collection(client, name, embeddings,\n  model_id, schema): Chroma
+    +index_chunks(store, chunks, batch_size): int
+  }
+}
+
+package "cvbot_core" <<library>> {
+  interface VectorStoreWriter <<Protocol>> {
+    +add_documents(documents, **kwargs): list[str]
+  }
+  class "embeddings" as coreEmb <<module>> {
+    +build_bedrock_embeddings(model_id, region_name)
+  }
+  class "vector_store" as coreVs <<module>> {
+    +create_chroma_client(host, port)
+  }
+  class "metadata" as coreMeta <<module>> {
+    +normalize_key() / split_values() / encode_schema()
+    +parse_period_year() / current_year()
+  }
+  class "env / validation / overrides" as coreCfg <<module>> {
+    +read_str() / read_int() / read_path()
+    +require_*() / apply_overrides()
+  }
+  class "tokens" as coreTok <<module>> {
+    +count_tokens(text): int
+  }
+  class "logging_config" as coreLog <<module>> {
+    +configure_logging(level)
+  }
+}
+
+package "third party" <<external>> {
+  class Document <<langchain>> {
+    +page_content: str
+    +metadata: dict
+  }
+  interface Embeddings <<langchain>>
+  class Chroma <<langchain-chroma>>
+  class ClientAPI <<chromadb>>
+  class MarkdownHeaderTextSplitter <<langchain-text-splitters>>
+  class TokenTextSplitter <<langchain-text-splitters>>
+}
+
+main ..> Settings : builds
+main ..> pipeline : calls
+main ..> coreLog
+pipeline ..> IndexingResult : creates
+pipeline ..> Settings
+pipeline ..> loader
+pipeline ..> DocumentChunker : creates
+pipeline ..> metadata
+pipeline ..> embeddings
+pipeline ..> vstore
+
+Settings ..> coreCfg : reads env,\nvalidates
+loader ..> Document : creates
+
+DocumentChunker *-- MarkdownHeaderTextSplitter
+DocumentChunker *-- TokenTextSplitter
+DocumentChunker ..> metadata : parses sections
+DocumentChunker ..> coreMeta
+DocumentChunker ..> coreTok
+DocumentChunker ..> Document : creates
+
+metadata ..> coreMeta
+metadata ..> Document
+
+embeddings ..> Settings
+embeddings ..> coreEmb
+embeddings ..> Embeddings : returns
+
+vstore ..> Settings
+vstore ..> coreVs
+vstore ..> coreMeta : encode_schema
+vstore ..> Chroma : creates
+vstore ..> ClientAPI
+vstore ..> VectorStoreWriter : writes through
+
+Chroma ..|> VectorStoreWriter
+Chroma o-- Embeddings
+Chroma o-- ClientAPI
+@enduml

@@ -1,0 +1,96 @@
+@startuml
+autonumber
+
+actor "Maintainer" as maintainer
+participant "GitHub Actions" as gha
+participant "AWS (EC2 / ECS API)" as aws
+database "S3\n(documents)" as s3
+participant "EC2 runner" as runner
+participant "__main__" as main
+participant "Settings" as settings
+participant "pipeline" as pipeline
+participant "loader" as loader
+participant "DocumentChunker" as chunker
+participant "metadata" as metadata
+participant "embeddings" as emb
+participant "vector_store" as vs
+participant "ChromaDB\n(Fargate)" as chroma
+participant "AWS Bedrock" as bedrock
+
+maintainer -> gha : push to main / workflow_dispatch
+
+== Job start-infra ==
+gha -> aws : assume deploy role (OIDC)
+gha -> aws : ec2 start-instances + wait instance-running
+gha -> aws : ecs update-service desired-count 1\n+ wait services-stable
+gha -> aws : list-tasks / describe-tasks\n/ describe-network-interfaces
+aws --> gha : private IP of chroma task
+note right of gha : exposed as output chroma_host
+
+== Job run-pipeline (self-hosted runner) ==
+gha -> runner : checkout, install dependencies
+runner -> s3 : aws s3 sync --delete
+s3 --> runner : documents/ (.md, .txt)
+runner -> main : python -m cvbot_embedder\n--chroma-host --chroma-port
+
+main -> settings : from_env().with_overrides(CLI args)
+settings --> main : validated Settings
+main -> main : configure_logging(log_level)
+main -> pipeline : run(settings)
+
+pipeline -> loader : load_documents(documents_dir)
+loader --> pipeline : list[Document]\n(source, filename)
+note right of loader : empty and non UTF-8 files are skipped
+
+pipeline -> emb : build_embeddings(settings)
+emb --> pipeline : Bedrock embedding model
+
+pipeline -> chunker : split(documents)
+loop for each document
+  alt Markdown
+    chunker -> metadata : split_metadata_block(section)
+    metadata --> chunker : fields, body
+    chunker -> metadata : derive_year_values(fields)
+    metadata --> chunker : years
+    chunker -> chunker : inherit fields from parent headings,\nadd iscurrent, build page content
+  else plain text
+    chunker -> chunker : split by paragraph\n(previous paragraph as overlap)
+  end
+  opt chunk exceeds max_chunk_tokens
+    chunker -> chunker : TokenTextSplitter split
+  end
+end
+chunker -> chunker : assign chunk_index per source
+chunker --> pipeline : list[Document] (chunks)
+
+pipeline -> metadata : collect_schema(chunks)
+metadata --> pipeline : field -> values (capped)
+
+pipeline -> vs : create_client(settings)
+vs --> pipeline : Chroma HTTP client
+
+pipeline -> vs : recreate_collection(client, name, embeddings,\nmodel_id, schema)
+vs -> chroma : delete_collection(name)
+vs -> chroma : create collection\n(embedding model id, metadata schema, hnsw cosine)
+vs --> pipeline : empty Chroma store
+
+pipeline -> vs : index_chunks(store, chunks, batch_size)
+loop for each batch
+  vs -> chroma : add_documents(batch)
+  chroma -> bedrock : InvokeModel (embed_documents)
+  bedrock --> chroma : vectors
+  chroma -> chroma : persist vectors (EFS)
+end
+vs --> pipeline : number of indexed chunks
+
+pipeline --> main : IndexingResult
+main --> runner : exit code 0
+
+alt ingestion fails
+  main --> runner : log exception, exit code 1
+end
+
+== Job stop-infra (always) ==
+gha -> aws : ecs update-service desired-count 0
+gha -> aws : ec2 stop-instances
+@enduml
