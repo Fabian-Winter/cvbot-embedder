@@ -50,20 +50,3 @@ package "cvbot_embedder" {
     +index_chunks(store, chunks, batch_size): int
   }
 }
-
-main ..> Settings : builds
-main ..> pipeline : calls
-
-pipeline ..> loader
-pipeline ..> DocumentChunker : creates
-pipeline ..> metadata : collect_schema
-pipeline ..> embeddings
-pipeline ..> vstore
-pipeline ..> IndexingResult : returns
-
-DocumentChunker ..> metadata : parses sections
-
-note bottom of Settings
-  Settings is passed to pipeline, embeddings
-  and vector_store as the only configuration.
-end note
