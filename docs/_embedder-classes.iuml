@@ -1,0 +1,69 @@
+package "cvbot_embedder" {
+  class "__main__" as main <<module>> {
+    +main(argv): int
+  }
+
+  class "pipeline" as pipeline <<module>> {
+    +run(settings): IndexingResult
+  }
+
+  class Settings <<frozen dataclass>> {
+    +documents_dir, chroma_host, chroma_port
+    +collection_name, aws_region, embedding_model_id
+    +max_chunk_tokens, token_chunk_overlap
+    +batch_size, log_level
+    +{static} from_env(env): Settings
+    +with_overrides(**overrides): Settings
+  }
+
+  class IndexingResult <<frozen dataclass>> {
+    +documents, chunks: int
+    +collection: str
+    +metadata_fields: int
+  }
+
+  class "loader" as loader <<module>> {
+    +load_documents(directory): list[Document]
+  }
+
+  class DocumentChunker {
+    +__init__(max_tokens, token_overlap)
+    +split(documents): list[Document]
+    -_split_markdown(document)
+    -_split_plaintext(document)
+  }
+
+  class "metadata" as metadata <<module>> {
+    +split_metadata_block(text)
+    +render_metadata_line(metadata)
+    +derive_year_values(metadata)
+    +collect_schema(chunks)
+  }
+
+  class "embeddings" as embeddings <<module>> {
+    +build_embeddings(settings): Embeddings
+  }
+
+  class "vector_store" as vstore <<module>> {
+    +create_client(settings): ClientAPI
+    +recreate_collection(...): Chroma
+    +index_chunks(store, chunks, batch_size): int
+  }
+}
+
+main ..> Settings : builds
+main ..> pipeline : calls
+
+pipeline ..> loader
+pipeline ..> DocumentChunker : creates
+pipeline ..> metadata : collect_schema
+pipeline ..> embeddings
+pipeline ..> vstore
+pipeline ..> IndexingResult : returns
+
+DocumentChunker ..> metadata : parses sections
+
+note bottom of Settings
+  Settings is passed to pipeline, embeddings
+  and vector_store as the only configuration.
+end note

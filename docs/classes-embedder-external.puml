@@ -1,0 +1,38 @@
+@startuml
+skinparam classAttributeIconSize 0
+hide empty members
+
+!include _embedder-classes.iuml
+
+package "third party" <<external>> {
+  class Document <<langchain>> {
+    +page_content: str
+    +metadata: dict
+  }
+  interface Embeddings <<langchain>>
+  class Chroma <<langchain-chroma>>
+  class ClientAPI <<chromadb>>
+  class MarkdownHeaderTextSplitter <<langchain-text-splitters>>
+  class TokenTextSplitter <<langchain-text-splitters>>
+}
+
+interface VectorStoreWriter <<Protocol, cvbot_core>> {
+  +add_documents(documents): list[str]
+}
+
+loader ..> Document : creates
+metadata ..> Document
+DocumentChunker ..> Document : creates
+
+DocumentChunker *-- MarkdownHeaderTextSplitter
+DocumentChunker *-- TokenTextSplitter
+
+embeddings ..> Embeddings : returns
+vstore ..> ClientAPI : returns
+vstore ..> Chroma : creates
+vstore ..> VectorStoreWriter : writes through
+
+Chroma ..|> VectorStoreWriter
+Chroma o-- Embeddings
+Chroma o-- ClientAPI
+@enduml

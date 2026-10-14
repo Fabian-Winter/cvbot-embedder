@@ -6,6 +6,7 @@ on:
     paths: [
       "cvbot_embedder/**",
       "tests/**",
+      "docs/*.iuml",
       "docs/*.puml",
       ".github/workflows/**"
     ]

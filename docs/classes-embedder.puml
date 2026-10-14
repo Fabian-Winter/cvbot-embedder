@@ -1,0 +1,6 @@
+@startuml
+skinparam classAttributeIconSize 0
+hide empty members
+
+!include _embedder-classes.iuml
+@enduml

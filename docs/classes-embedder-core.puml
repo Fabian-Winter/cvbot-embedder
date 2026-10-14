@@ -1,0 +1,49 @@
+@startuml
+skinparam classAttributeIconSize 0
+hide empty members
+
+!include _embedder-classes.iuml
+
+package "cvbot_core (shared library)" {
+  class "embeddings" as coreEmb <<module>> {
+    +build_bedrock_embeddings(model_id, region_name)
+  }
+  class "vector_store" as coreVs <<module>> {
+    +create_chroma_client(host, port)
+    +DEFAULT_CHROMA_HOST, DEFAULT_CHROMA_PORT
+    +DEFAULT_COLLECTION_NAME, DEFAULT_HNSW_SPACE
+  }
+  class "metadata" as coreMeta <<module>> {
+    +normalize_key(), split_values()
+    +parse_period_year(), current_year()
+    +encode_schema()
+  }
+  class "env / validation / overrides" as coreCfg <<module>> {
+    +read_str(), read_int(), read_path()
+    +require_*()
+    +apply_overrides()
+  }
+  class "tokens" as coreTok <<module>> {
+    +count_tokens(text): int
+  }
+  class "logging_config" as coreLog <<module>> {
+    +configure_logging(level)
+    +VALID_LOG_LEVELS
+  }
+  interface VectorStoreWriter <<Protocol>> {
+    +add_documents(documents): list[str]
+  }
+}
+
+main ..> coreLog
+Settings ..> coreCfg : reads env,\nvalidates
+Settings ..> coreVs : defaults
+Settings ..> coreLog : log levels
+embeddings ..> coreEmb
+vstore ..> coreVs
+vstore ..> coreMeta : encode_schema
+vstore ..> VectorStoreWriter : writes through
+metadata ..> coreMeta
+DocumentChunker ..> coreMeta
+DocumentChunker ..> coreTok
+@enduml
