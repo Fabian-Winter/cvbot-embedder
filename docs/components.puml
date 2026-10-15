@@ -1,59 +1,33 @@
 @startuml
 left to right direction
 
-actor "Maintainer" as maintainer
-component "GitHub Actions\n(run-pipeline.yml)" as gha
 cloud "AWS Bedrock\n(Titan embeddings)" as bedrock
 
 rectangle "AWS Account" {
-  component "IAM role\n(OIDC deploy role)" as iam
   database "S3\n(documents)" as s3
 
   component "EC2 GitHub Actions runner\n(self-hosted)" as runner {
     component "cvbot-embedder" as embedder {
       component "__main__\n(CLI entry point)" as main
-      component "config\n(Settings)" as config
       component "pipeline\n(run)" as pipeline
       component "loader" as loader
-      component "chunking\n(DocumentChunker)" as chunking
-      component "metadata\n(schema-on-write)" as metadata
       component "embeddings" as embeddings
       component "vector_store" as vstore
     }
-    component "cvbot-core\n(shared library)" as core
   }
 
   package "ECS Cluster (Fargate)" {
     component "chroma service\n(ChromaDB)" as chroma
   }
-  database "EFS\n(chroma-data)" as efs
 }
 
-component "cvbot-retriever\n(webapp service)" as retriever
-
-maintainer --> gha : push to main /\nworkflow_dispatch
-gha --> iam : assume role (OIDC)
-gha --> runner : start / stop instance\nrun job
-gha --> chroma : scale desired count 1 / 0\nresolve task IP
-
-s3 --> runner : aws s3 sync\n(.md / .txt)
-
-main --> config
 main --> pipeline
-pipeline --> loader : load documents
-pipeline --> chunking : split
-pipeline --> metadata : collect schema
 pipeline --> embeddings : build model
 pipeline --> vstore : recreate collection\nindex chunks
-chunking --> metadata : parse block,\nderive years
+pipeline --> loader : load documents
 
-config ..> core
-embeddings ..> core
-vstore ..> core
-chunking ..> core
+loader --> s3 : load from local sync
 
 vstore --> chroma : HTTP\n(CHROMA_HOST:CHROMA_PORT)
 embeddings ..> bedrock : embed_documents
-chroma --> efs : persists vectors
-retriever ..> chroma : reads chunks\n+ metadata schema
 @enduml
