@@ -1,11 +1,6 @@
 @startuml
 autonumber
 
-actor "Maintainer" as maintainer
-participant "GitHub Actions" as gha
-participant "AWS (EC2 / ECS API)" as aws
-database "S3\n(documents)" as s3
-participant "EC2 runner" as runner
 participant "__main__" as main
 participant "Settings" as settings
 participant "pipeline" as pipeline
@@ -17,22 +12,6 @@ participant "vector_store" as vs
 participant "ChromaDB\n(Fargate)" as chroma
 participant "AWS Bedrock" as bedrock
 
-maintainer -> gha : push to main / workflow_dispatch
-
-== Job start-infra ==
-gha -> aws : assume deploy role (OIDC)
-gha -> aws : ec2 start-instances + wait instance-running
-gha -> aws : ecs update-service desired-count 1\n+ wait services-stable
-gha -> aws : list-tasks / describe-tasks\n/ describe-network-interfaces
-aws --> gha : private IP of chroma task
-note right of gha : exposed as output chroma_host
-
-== Job run-pipeline (self-hosted runner) ==
-gha -> runner : checkout, install dependencies
-runner -> s3 : aws s3 sync --delete
-s3 --> runner : documents/ (.md, .txt)
-runner -> main : python -m cvbot_embedder\n--chroma-host --chroma-port
-
 main -> settings : from_env().with_overrides(CLI args)
 settings --> main : validated Settings
 main -> main : configure_logging(log_level)
@@ -40,7 +19,6 @@ main -> pipeline : run(settings)
 
 pipeline -> loader : load_documents(documents_dir)
 loader --> pipeline : list[Document]\n(source, filename)
-note right of loader : empty and non UTF-8 files are skipped
 
 pipeline -> emb : build_embeddings(settings)
 emb --> pipeline : Bedrock embedding model
@@ -84,13 +62,4 @@ end
 vs --> pipeline : number of indexed chunks
 
 pipeline --> main : IndexingResult
-main --> runner : exit code 0
-
-alt ingestion fails
-  main --> runner : log exception, exit code 1
-end
-
-== Job stop-infra (always) ==
-gha -> aws : ecs update-service desired-count 0
-gha -> aws : ec2 stop-instances
 @enduml
