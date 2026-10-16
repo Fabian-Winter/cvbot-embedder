@@ -30,7 +30,7 @@ loop for each document
     metadata --> chunker : fields, body
     chunker -> metadata : derive_year_values(fields)
     metadata --> chunker : years
-    chunker -> chunker : inherit fields from parent headings,\nadd iscurrent, build page content
+    chunker -> chunker : inherit fields from parent headings,\nadd iscurrent, build page content (header path,\nmetadata line, body)
   else plain text
     chunker -> chunker : split by paragraph\n(previous paragraph as overlap)
   end
@@ -54,12 +54,13 @@ vs --> pipeline : empty Chroma store
 
 pipeline -> vs : index_chunks(store, chunks, batch_size)
 loop for each batch
-  vs -> chroma : add_documents(batch)
-  chroma -> bedrock : InvokeModel (embed_documents)
-  bedrock --> chroma : vectors
+  vs -> bedrock : InvokeModel (embed_documents)
+  bedrock --> vs : vectors
+  vs -> chroma : add(batch, vectors)
   chroma -> chroma : persist vectors (EFS)
 end
 vs --> pipeline : number of indexed chunks
 
 pipeline --> main : IndexingResult
+main -> main : log summary, exit code 0\n(exit code 1 on any exception)
 @enduml
